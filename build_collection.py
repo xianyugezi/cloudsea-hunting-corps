@@ -27,11 +27,17 @@ import sys
 HERE = Path(__file__).resolve().parent
 COLLECTION = HERE / "云海猎团_设计稿合集.md"
 
-# (数字文件名, 汉字序号, 合集内标题)
+# (数字文件名或文件名列表, 汉字序号, 合集内标题)
+# 第 2 章自三期批次 52 起拆为 `02_职业解耦/` 分册（00_总则与共用资源层＋01–14 各职业），
+# 此处以列表按序拼接（分册内章节号保留原样；职业详解段在合集中位于共用层之后）。
 CHAPTERS = [
     ("00_世界观与术语规范.md",          "〇",   "世界观与术语规范"),
     ("01_战斗核心系统.md",              "一",   "战斗核心系统"),
-    ("02_职业×流派×武器解耦.md",         "二",   "十四职业 × 流派 × 武器解耦 + 风缆 / 绝技资源"),
+    (["02_职业解耦/00_总则与共用资源层.md"]
+     + sorted(str(p.relative_to(HERE)).replace("\\", "/")
+              for p in HERE.glob("02_职业解耦/[0-1][0-9]_*.md")
+              if not p.name.startswith("00_")),
+     "二",   "十四职业 × 流派 × 武器解耦 + 风缆 / 绝技资源"),
     ("03_巨兽与Boss设计.md",            "三",   "巨兽 / Boss 设计"),
     ("04_异常打击体系与共生灵.md",        "四",   "异常打击体系 + 共生灵"),
     ("05_成长与装备循环.md",             "五",   "成长与装备循环"),
@@ -50,6 +56,7 @@ CHAPTERS = [
 NAV_PATTERNS = (
     re.compile(r"^>\s*本文是设计稿"),
     re.compile(r"^>\s*总索引："),
+    re.compile(r"^>\s*\*\*拆分注记"),  # 三期批次 52 分册拆分注记不入合集
 )
 
 HEADER = """# 《云海猎团 Cloudsea Hunting Corps》· QQ 群异步回合制 RPG · PvE 设计稿
@@ -109,16 +116,19 @@ def strip_header(text: str) -> str:
 
 
 def main() -> int:
-    missing = [f for f, _, _ in CHAPTERS if not (HERE / f).exists()]
+    missing = [f for files, _, _ in CHAPTERS
+               for f in ([files] if isinstance(files, str) else files)
+               if not (HERE / f).exists()]
     if missing:
         print("缺少分章文件：", missing, file=sys.stderr)
         return 1
 
     toc = ["| 章节 | 内容 |", "|---|---|"]
     bodies = []
-    for fname, num, title in CHAPTERS:
-        raw = (HERE / fname).read_text(encoding="utf-8")
-        body = strip_header(raw)
+    for files, num, title in CHAPTERS:
+        if isinstance(files, str):
+            files = [files]
+        body = "\n\n".join(strip_header((HERE / f).read_text(encoding="utf-8")) for f in files)
         toc.append(f"| {num} | {title} |")
         bodies.append(f"## {num}、{title}\n\n{body}\n")
 
